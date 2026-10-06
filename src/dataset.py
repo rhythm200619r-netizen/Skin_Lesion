@@ -6,7 +6,10 @@ PyTorch Dataset + helper functions for ISIC skin lesion images.
 - Reads image_name / target columns from a metadata CSV
 - Resizes to 224x224, normalizes with ImageNet stats
 - Basic augmentation (flip/rotate/color jitter) for the training split only
-- Stratified train/val split so both classes are represented in validation
+- Patient-grouped, stratified TRAIN / VAL / TEST split (no patient in two splits)
+    train -> fit weights
+    val   -> pick checkpoint, fit calibrators
+    test  -> final reported numbers (never touched during training)
 """
 
 import os
@@ -15,7 +18,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
 from torch.utils.data import Dataset
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
@@ -32,14 +35,30 @@ def load_metadata(csv_path):
     return df
 
 
+def _one_fold(df, frac, seed):
+    """Hold out ~`frac` of df, stratified by target and grouped by patient_id if present."""
+    n_splits = max(2, round(1 / frac))
+    if "patient_id" in df.columns:
+        splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+        rest_idx, held_idx = next(splitter.split(df, df["target"], groups=df["patient_id"]))
+    else:
+        print("WARNING: no 'patient_id' column -> split is NOT patient-grouped (possible leakage)")
+        splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+        rest_idx, held_idx = next(splitter.split(df, df["target"]))
+    return df.iloc[rest_idx].reset_index(drop=True), df.iloc[held_idx].reset_index(drop=True)
+
+
+def three_way_split(df, val_size=0.15, test_size=0.15, seed=42):
+    """Deterministic train/val/test split. Same args + same CSV -> same split everywhere."""
+    rest, test_df = _one_fold(df, test_size, seed)
+    train_df, val_df = _one_fold(rest, val_size / (1 - test_size), seed)
+    return train_df, val_df, test_df
+
+
 def stratified_split(df, val_size=0.15, seed=42):
-    train_df, val_df = train_test_split(
-        df,
-        test_size=val_size,
-        stratify=df["target"],
-        random_state=seed,
-    )
-    return train_df.reset_index(drop=True), val_df.reset_index(drop=True)
+    """Backward-compatible 2-way split (patient-grouped if possible)."""
+    train_df, val_df = _one_fold(df, val_size, seed)
+    return train_df, val_df
 
 
 def _resolve_image_path(img_dir, image_name):
@@ -48,8 +67,7 @@ def _resolve_image_path(img_dir, image_name):
         if os.path.exists(p):
             return p
     # Fall back: maybe image_name already has extension
-    p = os.path.join(img_dir, image_name)
-    return p
+    return os.path.join(img_dir, image_name)
 
 
 class ISICDataset(Dataset):
@@ -68,17 +86,13 @@ class ISICDataset(Dataset):
         return len(self.df)
 
     def _augment(self, img):
-        # Random horizontal flip
         if np.random.rand() < 0.5:
             img = cv2.flip(img, 1)
-        # Random vertical flip (dermoscopic images have no canonical orientation)
         if np.random.rand() < 0.5:
             img = cv2.flip(img, 0)
-        # Random rotation (0/90/180/270 -- cheap, no interpolation artifacts)
         k = np.random.randint(0, 4)
         if k:
             img = np.rot90(img, k).copy()
-        # Mild brightness/contrast jitter
         if np.random.rand() < 0.5:
             alpha = 1.0 + (np.random.rand() - 0.5) * 0.3  # contrast 0.85-1.15
             beta = (np.random.rand() - 0.5) * 30  # brightness -15..15
