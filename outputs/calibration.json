@@ -1,0 +1,8 @@
+{
+  "method": "temperature_scaling",
+  "temperature": 1.7721771001815796,
+  "validation_samples": 4709,
+  "uncalibrated_nll": 0.19159910082817078,
+  "calibrated_nll": 0.16973981261253357,
+  "calibrated_validation_accuracy": 0.9210023283958435
+}
