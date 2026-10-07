@@ -28,6 +28,8 @@ IMG_SIZE = 224
 
 def load_metadata(csv_path):
     df = pd.read_csv(csv_path)
+    if "image_name" not in df.columns and "isic_id" in df.columns:
+        df = df.rename(columns={"isic_id": "image_name"})  # ISIC-2024-style CSVs
     required = {"image_name", "target"}
     missing = required - set(df.columns)
     if missing:
