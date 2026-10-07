@@ -1,5 +1,11 @@
+"""
+demo.py — Interactive desktop GUI for DermaVision.
+NOTE: This module requires `customtkinter` and cannot be run in headless
+environments like Kaggle Notebooks. It is strictly for local deployment.
+"""
+
 import os
-import tkinter as tk
+
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk

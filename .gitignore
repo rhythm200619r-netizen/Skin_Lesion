@@ -6,3 +6,4 @@ data/
 outputs/
 .env
 .ipynb_checkpoints/
+scratch/

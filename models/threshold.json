@@ -1,0 +1,12 @@
+{
+  "target_sensitivity": 0.9,
+  "threshold_target_sens": 0.2884561850904622,
+  "achieved_sensitivity": 0.9047619047619048,
+  "specificity_at_target_sens": 0.6519681651968166,
+  "threshold_youden": 0.457784019520569,
+  "sensitivity_at_youden": 0.8452380952380952,
+  "specificity_at_youden": 0.7829640782964078,
+  "raw_threshold_target_sens": 0.12807868,
+  "raw_threshold_youden": 0.41106108,
+  "calibration_method": "temperature"
+}
